@@ -1,1 +1,64 @@
 
+# =========================
+# Node.js / Backend
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Logs
+logs/
+*.log
+
+# Environment variables (IMPORTANT - contains DB credentials)
+.env
+.env.*
+!.env.example
+
+# =========================
+# React Build / Frontend
+# =========================
+build/
+dist/
+.next/
+out/
+
+# Coverage
+coverage/
+
+# =========================
+# OS / System files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# =========================
+# SQL Server / Database
+# =========================
+*.bak
+*.trn
+*.ldf
+*.mdf
+
+# SQL temp / scripts output
+*.sqlplan
+*.dbmdl
+
+# =========================
+# Misc
+# =========================
+tmp/
+temp/
+.cache/
