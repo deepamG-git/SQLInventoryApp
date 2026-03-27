@@ -6,11 +6,20 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
+-package-lock.json
 
 # Logs
 logs/
 *.log
+@@
+ tmp/
+ temp/
+ .cache/
++
++# Packaging / process manager artifacts
++*.zip
++*.pid
++.pm2/
 
 # Environment variables (IMPORTANT - contains DB credentials)
 .env
