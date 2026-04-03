@@ -1,0 +1,21 @@
+﻿/****** Object:  Table [inventory].[Contact]    Script Date: 03-04-2026 15:48:44 ******/
+SET ANSI_NULLS ON
+SET QUOTED_IDENTIFIER ON
+CREATE TABLE [inventory].[Contact](
+	[ContactID] [int] IDENTITY(1,1) NOT NULL,
+	[ContactName] [varchar](150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Email] [varchar](150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Phone] [varchar](50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+ CONSTRAINT [PK_Contact] PRIMARY KEY CLUSTERED 
+(
+	[ContactID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+SET ANSI_PADDING ON
+
+/****** Object:  Index [UX_Contact_Email]    Script Date: 03-04-2026 15:48:44 ******/
+CREATE UNIQUE NONCLUSTERED INDEX [UX_Contact_Email] ON [inventory].[Contact]
+(
+	[Email] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
