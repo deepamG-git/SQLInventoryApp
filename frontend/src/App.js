@@ -1437,11 +1437,13 @@ function HealthReportPage({ token, username, role, onLogout }) {
                         { header: "DatabaseName", key: "DatabaseName" },
                         { header: "RecentFullBackupDate", key: "RecentFullBackupDate" },
                         { header: "RecentDiffBackupDate", key: "RecentDiffBackupDate" },
+                        { header: "RecentLogBackupDate", key: "RecentLogBackupDate" },
                       ],
                       rows: (data.backupByDb || []).map((r) => ({
                         ...r,
                         RecentFullBackupDate: fmtDateTime(r.RecentFullBackupDate),
                         RecentDiffBackupDate: fmtDateTime(r.RecentDiffBackupDate),
+                        RecentLogBackupDate: fmtDateTime(r.RecentLogBackupDate),
                       })),
                     },
                     {
@@ -1531,7 +1533,7 @@ function HealthReportPage({ token, username, role, onLogout }) {
             <div className="table-wrap" style={{ marginTop: 12 }}>
               <table className="data-table">
                 <thead>
-                  <tr><th>SQL Instance</th><th>DatabaseName</th><th>RecentFullBackupDate</th><th>RecentDiffBackupDate</th></tr>
+                  <tr><th>SQL Instance</th><th>DatabaseName</th><th>RecentFullBackupDate</th><th>RecentDiffBackupDate</th><th>RecentLogBackupDate</th></tr>
                 </thead>
                 <tbody>
                   {(data.backupByDb || []).map((r, idx) => (
@@ -1540,9 +1542,10 @@ function HealthReportPage({ token, username, role, onLogout }) {
                       <td>{r.DatabaseName}</td>
                       <td>{fmtDateTime(r.RecentFullBackupDate)}</td>
                       <td>{fmtDateTime(r.RecentDiffBackupDate)}</td>
+                      <td>{fmtDateTime(r.RecentLogBackupDate)}</td>
                     </tr>
                   ))}
-                  {!(data.backupByDb || []).length ? <tr><td colSpan={4} style={{ textAlign: "center" }}>No per-database backup rows found.</td></tr> : null}
+                  {!(data.backupByDb || []).length ? <tr><td colSpan={5} style={{ textAlign: "center" }}>No per-database backup rows found.</td></tr> : null}
                 </tbody>
               </table>
             </div>

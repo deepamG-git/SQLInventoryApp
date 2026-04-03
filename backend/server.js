@@ -852,7 +852,7 @@ app.get("/api/health/report", authenticate, async (req, res) => {
       const typeLabel = { D: "Full", I: "Differential", L: "Transaction Logs" };
       backupSummary = ["L", "I", "D"].map((t) => ({ BackupType: typeLabel[t] || t, Successful: byType.get(t) || 0, Failed: 0 }));
 
-      // Per-DB latest full/diff backup finish timestamps (per instance).
+      // Per-DB latest full/diff/log backup finish timestamps (per instance).
       const byDbRs = hasBackupTable ? await conn.request().query(`
         WITH dbs AS (
           SELECT SQLInstanceID, DatabaseName
@@ -870,16 +870,24 @@ app.get("/api/health/report", authenticate, async (req, res) => {
           FROM inventory.DatabaseBackup
           WHERE BackupType = 'I' AND SQLInstanceID IN (${idsCsv})
           GROUP BY SQLInstanceID, DatabaseName
+        ),
+        logs AS (
+          SELECT SQLInstanceID, DatabaseName, MAX(BackupFinishDate) AS RecentLogBackupDate
+          FROM inventory.DatabaseBackup
+          WHERE BackupType = 'L' AND SQLInstanceID IN (${idsCsv})
+          GROUP BY SQLInstanceID, DatabaseName
         )
         SELECT
           si.InstanceName AS SQLInstanceName,
           dbs.DatabaseName,
           f.RecentFullBackupDate,
-          d.RecentDiffBackupDate
+          d.RecentDiffBackupDate,
+          l.RecentLogBackupDate
         FROM dbs
         INNER JOIN inventory.SQLInstance si ON si.SQLInstanceID = dbs.SQLInstanceID
         LEFT JOIN fulls f ON f.SQLInstanceID = dbs.SQLInstanceID AND f.DatabaseName = dbs.DatabaseName
         LEFT JOIN diffs d ON d.SQLInstanceID = dbs.SQLInstanceID AND d.DatabaseName = dbs.DatabaseName
+        LEFT JOIN logs l ON l.SQLInstanceID = dbs.SQLInstanceID AND l.DatabaseName = dbs.DatabaseName
         ORDER BY si.InstanceName, dbs.DatabaseName;
       `) : { recordset: [] };
       backupByDb = byDbRs.recordset || [];
