@@ -138,13 +138,33 @@ Typical:
 - `DB_NAME=SQLInventory`
 - `DB_USER=...`
 - `DB_PASSWORD=...`
-- `JWT_SECRET=...`
+- `JWT_SECRET=...` (required; minimum 32 chars recommended 64+)
+- `JWT_EXPIRY=15m` (default is `15m` if not set)
+- `JWT_ALGORITHM=HS256` (default)
+- Optional: `JWT_ISSUER=...` and `JWT_AUDIENCE=...` (recommended in production)
 - `PORT=5000`
+
+IIS / reverse proxy (recommended when hosted behind ARR):
+- `TRUST_PROXY=1`
+- `FORCE_HTTPS=0` if your IIS site serves both HTTP and HTTPS
+- `FORCE_HTTPS=1` if you want to block HTTP (requires correct `X-Forwarded-Proto` from IIS)
+
+CORS hardening (recommended even on intranet):
+- `CORS_ORIGINS=http://localhost:3000,http://localhost,http://<iis-server-ip>` (set exact UI origins; no paths)
+
+Optional brute-force protection for login:
+- `ENABLE_LOGIN_RATE_LIMIT=1`
+- `LOGIN_RATE_WINDOW_MS=900000` (15 minutes)
+- `LOGIN_RATE_MAX=30` (per IP per window; tune for NAT'd intranet users)
 
 ### API Endpoints
 Auth:
 - `POST /api/auth/login`
 - `GET /api/auth/me`
+
+Reports (email):
+- `POST /api/health/email-report`
+- `POST /api/db-trend/email-report`
 
 Admin-only:
 - `GET /api/lookups`
@@ -163,6 +183,7 @@ Read-only + Admin:
 - `GET /api/server-list?bu=<BUID>&inUseOnly=1`
 - `GET /api/database-list?buId=<BUID>&serverId=<ServerID>`
 - `GET /api/db-trend?buId=<BUID>&serverId=<ServerID>&monthsBack=6`
+- `POST /api/db-trend/email-report`
 
 ### Change History
 Updates are logged into:
@@ -176,24 +197,73 @@ Idempotent DDL script:
 - `..\backend\sql\alter_20260312_add_sqlinstalldate.sql`
 
 ## SQL Objects (Collectors + Reporting Tables)
-Key SQL scripts live under `..\backend\sql\` (recommended schedule: hourly for collectors, monthly for trend rollup):
-- SQLDatabase inventory and trend:
-  - `alter_20260318_create_sqldatabase.sql`
-  - `alter_20260319_create_sqldatabase_daily_snapshot.sql`
-  - `alter_20260319_create_sqldatabase_monthly_max.sql`
-  - `sp_20260319_refresh_sqldatabase_from_linkedservers.sql`
-  - `sp_20260319_calc_sqldatabase_monthly_max.sql`
-- Backup reporting:
-  - `alter_20260319_create_databasebackup.sql`
-  - `sp_20260319_collect_databasebackup_last24h.sql`
-  - `sp_20260320_collect_databasebackup_all_linkedservers.sql`
-- Maintenance job reporting:
-  - `alter_20260319_create_sqlmaintenancejobrun.sql`
-  - `sp_20260319_collect_sqlmaintenancejobs.sql`
-- Linked Server mapping helper:
-  - `alter_20260319_create_linkedserver_map.sql`
-- Health email (Database Mail):
-  - `sp_20260324_email_health_report_dbmail.sql`
+Key SQL scripts live under `..\backend\sql\` 
+- DDL Scripts
+  - `create_sqldatabase.sql`
+  - `create_login_and_databaseuser.sql`
+  - `create_all_tables.sql (individual table creation scripts also available)`
+  - `create_all_storedprocedures.sql (individual stored procedure scripts also available)`
+  - `create_vw_server_list_flattened.sql (flattened view across all tables)`
+- DML Scripts
+  - `insert_data_lookuptables.sql (sample data for lookup tables)`
+  - `portal_user_creation.sql (sample user creation script for Inventory Portal)`
+
+- Tables:
+  - Lookup Tables                
+    - `Environment`   
+    - `Region`
+    - `ServerCategory`
+    - `ServerStatus`
+    - `ServerType`
+    - `Platform`
+    - `Domain`
+    - `Timezone`
+    - `OSType`
+    - `IPAddressType`
+    - `BusinessUnit`
+    - `ContactCategory`
+    - `SQLEdition`
+    - `SQLVersion`
+    - `SQLInstanceType`
+    - `SQLInstanceCollation`
+  - Infrastructure Tables(Server Management)
+    - `Server`
+    - `ServerHardware`
+    - `ServerIP`
+    - `ServerStorage`
+  - SQL Instance Tables
+    - `SQLInstance`
+    - `SQLInstanceVersion`
+    - `SQLInstanceConfig`
+    - `SQLInstanceLinkedServer`
+  - Database Metrics Tables
+    - `SQLDatabase`
+  - Contacts & Ownership Tables
+    - `Contact`
+    - `BusinessUnitContact`
+    - `ServerContact`\
+  - Monitoring & Operations Tables
+    - `SQLMaintenanceJobRun`
+    - `SQLDatabaseDailySnapshot`
+    - `SQLDatabaseMonthlyMax`
+    - `DatabaseBackup`
+  - Audit & Change Tracking Tables
+    - `ChangeHistory`
+  - User Management Tables
+    - `AppUser`
+
+- Stored Procedures: (recommended schedule: hourly for collectors, monthly for trend rollup):
+  - Data Refresh Procedures 
+    - `usp_Collect_DatabaseBackups_Last24h`
+    - `usp_Collect_SQLMaintenanceJobs`
+    - `usp_Refresh_ServerStorage_FromLinkedServers`
+    - `usp_Refresh_SQLDatabase_FromLinkedServers`
+    - `usp_Sync_Database_PrimarySecondaryInstance`
+  - Email Reporting Procedures
+    - `usp_Email_DBTrend_Server`
+    - `usp_Email_HealthReport_Server`
+  - Trend reporting Procedures
+    - `usp_Calc_SQLDatabaseMonthlyMax`
 
 ## IIS Intranet Hosting (Reverse Proxy)
 IIS serves the React `build` folder and proxies `/api/*` to Node at `http://localhost:5000`.
@@ -204,14 +274,26 @@ IIS serves the React `build` folder and proxies `/api/*` to Node at `http://loca
   - IIS Manager -> Server -> Application Request Routing Cache -> Server Proxy Settings -> Enable Proxy
 
 ### `web.config`
-React build includes `web.config` (from `public/web.config`) to:
+`web.config` must live in the IIS site root (typically `frontend/build/`) and handles:
 - Proxy `/api/*` -> `http://localhost:5000/api/*`
 - SPA fallback routing to `index.html`
+
+Source file:
+- `frontend/public/web.config` (copied into `build/` during `npm run build`)
+
+If you serve both HTTP and HTTPS, use two proxy rules so `X-Forwarded-Proto` is correct per request.
+Also add these to IIS URL Rewrite "Allowed Server Variables":
+- `HTTP_X_FORWARDED_PROTO`
+- `HTTP_X_FORWARDED_FOR`
+- `HTTP_X_FORWARDED_HOST`
+
+Backend must be configured with `TRUST_PROXY=1` so Express reads `X-Forwarded-*` properly.
+If you want to allow both HTTP and HTTPS, keep `FORCE_HTTPS=0` (recommended to enforce HTTPS when possible).
 
 ### Firewall Guidance (IIS Server)
 - Allow inbound TCP 80 (intranet only)
 - Block inbound TCP 5000 (Node API should not be exposed)
-- Allow outbound to SQL Server TCP 1433 (to `VGLIND-TSDB-SRV`)
+- Allow outbound to SQL Server TCP 1433 
 
 ## Build and Deploy (Frontend)
 ```powershell

@@ -62,8 +62,26 @@ DB_NAME=SQLInventory
 DB_USER=...
 DB_PASSWORD=...
 
-JWT_SECRET=<set a long random string>
-JWT_EXPIRY=8h
+JWT_SECRET=<set a long random string (min 32 chars; recommended 64+)>
+JWT_EXPIRY=15m
+JWT_ALGORITHM=HS256
+# Optional hardening (recommended for production):
+# JWT_ISSUER=inventory-api
+# JWT_AUDIENCE=inventory-ui
+
+# IIS/ARR (recommended on server):
+TRUST_PROXY=1
+# If IIS serves both HTTP and HTTPS, keep this 0 (recommended to enforce HTTPS when possible)
+FORCE_HTTPS=0
+
+# CORS (recommended; set exact UI origins - no paths)
+# Example local dev + intranet:
+# CORS_ORIGINS=http://localhost:3000,http://localhost,http://<iis-server-ip>
+
+# Optional: brute-force protection for login (tune carefully for NAT'd intranet users)
+# ENABLE_LOGIN_RATE_LIMIT=1
+# LOGIN_RATE_WINDOW_MS=900000
+# LOGIN_RATE_MAX=30
 
 PORT=5000
 ```
@@ -174,6 +192,12 @@ Your IIS physical path must contain:
 - `index.html`
 - `web.config` (required for SPA routing + API reverse proxy)
 
+`web.config` is sourced from:
+- `frontend/public/web.config` (copied into `build/` during `npm run build`)
+
+If IIS serves both HTTP and HTTPS, `web.config` should set `X-Forwarded-Proto` per request (two rules: one for `{HTTPS}=on`, one for `{HTTPS}=off`).
+Backend should have `TRUST_PROXY=1` so Express reads `X-Forwarded-*` correctly.
+
 ### 5.5 IIS requirements (modules)
 Install on the IIS server:
 - IIS URL Rewrite
@@ -182,15 +206,22 @@ Install on the IIS server:
 Enable proxy:
 - IIS Manager -> Server -> Application Request Routing Cache -> Server Proxy Settings -> Enable Proxy
 
+Important (required if using `serverVariables` in `web.config`):
+- IIS URL Rewrite -> "View Server Variables" -> add to "Allowed Server Variables":
+  - `HTTP_X_FORWARDED_PROTO`
+  - `HTTP_X_FORWARDED_FOR`
+  - `HTTP_X_FORWARDED_HOST`
+
 ### 5.6 IIS site configuration
 Create a website or use Default Web Site (recommended: dedicated site):
-- Port: 80
+- Port: 80 (HTTP)
+- Port: 443 (HTTPS) if you have a certificate (recommended even on intranet)
 - Hostname: optional (if you have DNS); otherwise use server IP
 - Physical Path: `E:\Apps\SQLInventory\frontend` (folder containing `index.html`)
 
 ### 5.7 Firewall guidance (IIS server)
 Recommended inbound rules:
-- Allow TCP 80 (intranet only)
+- Allow TCP 80 and 443 (intranet only)
 - Block TCP 5000 (do not expose Node)
 
 Example:
@@ -241,3 +272,7 @@ you must deploy the updated backend at the same time. Otherwise UI may show `0` 
 ### Reverse proxy behavior
 In IIS deployments, the frontend calls `/api/...` (same origin). Do not configure frontend to call `http://localhost:5000` in production.
 
+### Email reports (Database Mail)
+Email buttons in the UI call backend endpoints that execute SQL stored procedures (Database Mail must be configured):
+- Health Report: `POST /api/health/email-report` -> stored procedure `inventory.usp_Email_HealthReport_Server`
+- Database Trend: `POST /api/db-trend/email-report` -> stored procedure `inventory.usp_Email_DBTrend_Server` (reference script: `backend/sql/sp_20260403_email_dbtrend_report_dbmail.sql`)
