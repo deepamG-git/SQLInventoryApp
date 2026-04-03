@@ -452,10 +452,10 @@ BEGIN
 
   SET @html += N'</table>';
 
-  -- Recent backups by database (latest full/diff)
+  -- Recent backups by database (latest full/diff/log)
   SET @html += N'<h3 style="margin-top:18px;">Database Backup Details</h3>';
   SET @html += N'<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse; font-family:Segoe UI, Arial; font-size:12px;">';
-  SET @html += N'<tr style="background:#f3f6fb;"><th align="left">SQL Instance</th><th align="left">Database</th><th align="left">Recent Full Backup</th><th align="left">Recent Diff Backup</th></tr>';
+  SET @html += N'<tr style="background:#f3f6fb;"><th align="left">SQL Instance</th><th align="left">Database</th><th align="left">Recent Full Backup</th><th align="left">Recent Diff Backup</th><th align="left">Recent Log Backup</th></tr>';
 
   ;WITH dbs AS (
     SELECT d.SQLInstanceID, d.DatabaseName
@@ -476,6 +476,13 @@ BEGIN
     WHERE BackupType = 'I'
       AND EXISTS (SELECT 1 FROM @inst i WHERE i.SQLInstanceID = SQLInstanceID)
     GROUP BY SQLInstanceID, DatabaseName
+  ),
+  logs AS (
+    SELECT SQLInstanceID, DatabaseName, MAX(BackupFinishDate) AS RecentLogBackupDate
+    FROM inventory.DatabaseBackup
+    WHERE BackupType = 'L'
+      AND EXISTS (SELECT 1 FROM @inst i WHERE i.SQLInstanceID = SQLInstanceID)
+    GROUP BY SQLInstanceID, DatabaseName
   )
   SELECT @html += (
     SELECT
@@ -483,11 +490,13 @@ BEGIN
       N'</td><td>' + dbs.DatabaseName +
       N'</td><td>' + ISNULL(CONVERT(nvarchar(19), f.RecentFullBackupDate, 120), N'') +
       N'</td><td>' + ISNULL(CONVERT(nvarchar(19), d.RecentDiffBackupDate, 120), N'') +
+      N'</td><td>' + ISNULL(CONVERT(nvarchar(19), l.RecentLogBackupDate, 120), N'') +
       N'</td></tr>'
     FROM dbs
     INNER JOIN @inst i ON i.SQLInstanceID = dbs.SQLInstanceID
     LEFT JOIN fulls f ON f.SQLInstanceID = dbs.SQLInstanceID AND f.DatabaseName = dbs.DatabaseName
     LEFT JOIN diffs d ON d.SQLInstanceID = dbs.SQLInstanceID AND d.DatabaseName = dbs.DatabaseName
+    LEFT JOIN logs l ON l.SQLInstanceID = dbs.SQLInstanceID AND l.DatabaseName = dbs.DatabaseName
     ORDER BY i.InstanceName, dbs.DatabaseName
     FOR XML PATH(''), TYPE
   ).value('.','nvarchar(max)');
